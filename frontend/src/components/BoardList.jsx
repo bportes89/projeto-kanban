@@ -33,7 +33,22 @@ const BoardList = () => {
               console.error('Auto-migration failed:', migrateError);
           }
       }
-      const errorMessage = error.response?.data?.error || error.message || 'Erro ao carregar quadros.';
+      
+      let errorMessage = 'Erro desconhecido.';
+      if (error.response?.data) {
+        if (typeof error.response.data === 'string') {
+           errorMessage = error.response.data;
+        } else if (error.response.data.error) {
+           errorMessage = typeof error.response.data.error === 'object' 
+             ? JSON.stringify(error.response.data.error) 
+             : error.response.data.error;
+        } else {
+           errorMessage = JSON.stringify(error.response.data);
+        }
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      
       setError(`Erro: ${errorMessage}`);
     } finally {
       setLoading(false);
