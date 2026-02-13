@@ -9,6 +9,24 @@ const PORT = process.env.PORT || 3001;
 app.use(cors());
 app.use(express.json());
 
+// --- System Routes ---
+app.get('/api/health', (req, res) => {
+  res.json({ status: 'ok', timestamp: new Date() });
+});
+
+const { sequelize } = require('./models');
+app.get('/api/migrate', async (req, res) => {
+  try {
+    await sequelize.authenticate();
+    console.log('Database connection OK!');
+    await sequelize.sync({ alter: true });
+    res.json({ status: 'Database synced successfully!' });
+  } catch (error) {
+    console.error('Migration failed:', error);
+    res.status(500).json({ error: 'Migration failed: ' + error.message });
+  }
+});
+
 // --- Routes ---
 
 // Get all boards
