@@ -39,6 +39,12 @@ try {
              connectionString = connectionString.slice(1, -1);
          }
          
+         // Special handling for psql command format (common mistake)
+         // e.g., "psql 'postgres://...'"
+         if (connectionString.startsWith("psql '")) {
+             connectionString = connectionString.replace("psql '", "").replace("'", "");
+         }
+         
          const { protocol, ...cleanDbConfig } = dbConfig;
          
          // Try manual parsing with better error handling
@@ -55,9 +61,11 @@ try {
             }
          }
          
+         console.log('Parsed URL host:', url.hostname);
+         
          sequelize = new Sequelize(url.pathname.substring(1), url.username, url.password, {
              host: url.hostname,
-             port: url.port,
+             port: url.port || 5432,
              dialect: 'postgres',
              dialectModule: pg,
              logging: false,
