@@ -70,18 +70,18 @@ try {
              dialectModule: pg,
              logging: false,
              pool: {
-                 max: 1, // Reduce connection pool for serverless
+                 max: 1, // Keep low for serverless
                  min: 0,
-                 acquire: 30000,
+                 acquire: 60000, // Increase acquire timeout to 60s for cold starts
                  idle: 10000
              },
              dialectOptions: {
                  ssl: {
                      require: true,
-                     rejectUnauthorized: false // Required for some Vercel/Postgres providers
+                     rejectUnauthorized: false
                  },
-                 keepAlive: true, // Help keep connection alive
-                 connectionTimeoutMillis: 10000 // Timeout faster if stuck
+                 keepAlive: true,
+                 connectionTimeoutMillis: 30000 // Increase connection timeout to 30s
              }
          });
      } catch (err) {
