@@ -8,14 +8,14 @@
     "storage": ":memory:"
   },
   "production": {
-    "use_env_variable": "POSTGRES_URL",
     "dialect": "postgres",
+    "use_env_variable": "POSTGRES_URL",
+    "protocol": "postgres",
     "dialectOptions": {
       "ssl": {
         "require": true,
         "rejectUnauthorized": false
-      },
-      "connectTimeout": 60000
+      }
     }
   }
 }

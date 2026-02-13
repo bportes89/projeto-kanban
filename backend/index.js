@@ -31,6 +31,14 @@ app.get('/api/migrate', async (req, res) => {
   }
 });
 
+// Test connection immediately to catch errors early
+const { sequelize } = require('./models');
+sequelize.authenticate().then(() => {
+  console.log('Database connection OK!');
+}).catch(err => {
+  console.error('Unable to connect to the database:', err);
+});
+
 // --- Routes ---
 app.get('/api/debug/env', (req, res) => {
     res.json({
