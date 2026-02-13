@@ -43,16 +43,17 @@ const BoardList = () => {
         if (typeof error.response.data === 'string') {
            errorMessage = error.response.data;
         } else if (error.response.data.error) {
-           errorMessage = typeof error.response.data.error === 'object' 
-             ? JSON.stringify(error.response.data.error) 
-             : error.response.data.error;
+           const backendError = error.response.data;
+           errorMessage = backendError.error;
+           if (backendError.details) {
+               errorMessage += `: ${backendError.details}`;
+           }
         } else {
            errorMessage = JSON.stringify(error.response.data);
         }
       } else if (error.message) {
         errorMessage = error.message;
       }
-      
       setError(`Erro: ${errorMessage}`);
     } finally {
       setLoading(false);
