@@ -45,27 +45,9 @@ try {
              connectionString = connectionString.replace("psql '", "").replace("'", "");
          }
          
-         const { protocol, ...cleanDbConfig } = dbConfig;
+         console.log('Using connection string directly with Sequelize');
          
-         // Try manual parsing with better error handling
-         let url;
-         try {
-            url = new URL(connectionString);
-         } catch (e) {
-            // If URL parsing fails, maybe it's missing the protocol?
-            if (!connectionString.includes('://')) {
-                 console.log('URL missing protocol, adding postgres://');
-                 url = new URL('postgres://' + connectionString);
-            } else {
-                 throw e;
-            }
-         }
-         
-         console.log('Parsed URL host:', url.hostname);
-         
-         sequelize = new Sequelize(url.pathname.substring(1), url.username, url.password, {
-             host: url.hostname,
-             port: url.port || 5432,
+         sequelize = new Sequelize(connectionString, {
              dialect: 'postgres',
              dialectModule: pg,
              logging: false,
@@ -234,12 +216,30 @@ app.get('/api/migrate', async (req, res) => {
   try {
     if (dbInitError) throw dbInitError;
     if (!sequelize) throw new Error('Database not initialized');
-    await sequelize.authenticate();
-    console.log('Database connection OK!');
-    await sequelize.sync({ alter: true });
-    res.json({ status: 'Database synced successfully!' });
+    
+    // Retry logic for cold starts
+    const maxRetries = 3;
+    let lastError;
+    
+    for (let i = 0; i < maxRetries; i++) {
+        try {
+            console.log(`Migration attempt ${i + 1}/${maxRetries}...`);
+            await sequelize.authenticate();
+            console.log('Database connection OK!');
+            await sequelize.sync({ alter: true });
+            console.log('Database synced successfully!');
+            return res.json({ status: 'Database synced successfully!' });
+        } catch (err) {
+            console.error(`Attempt ${i + 1} failed:`, err.message);
+            lastError = err;
+            // Wait 2 seconds before retrying
+            if (i < maxRetries - 1) await new Promise(resolve => setTimeout(resolve, 2000));
+        }
+    }
+    
+    throw lastError;
   } catch (error) {
-    console.error('Migration failed:', error);
+    console.error('Migration failed after retries:', error);
     res.status(500).json({ 
         error: 'Migration failed',
         details: error.message,
