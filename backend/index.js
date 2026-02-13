@@ -251,6 +251,11 @@ app.get('/api/migrate', async (req, res) => {
 if (sequelize) {
     sequelize.authenticate().then(() => {
       console.log('Database connection OK!');
+      // Auto-sync models to create tables if they don't exist
+      console.log('Syncing database models...');
+      return sequelize.sync({ alter: true });
+    }).then(() => {
+      console.log('Database synced successfully!');
     }).catch(err => {
       console.error('Unable to connect to the database:', err);
       dbInitError = err;
