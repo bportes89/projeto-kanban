@@ -1,8 +1,7 @@
 const express = require('express');
 const cors = require('cors');
-// Import models and sequelize instance *once*
-const db = require('./models');
-const { Board, Column, Card, Message, ChecklistItem, sequelize } = db;
+const { Sequelize, DataTypes } = require('sequelize');
+const pg = require('pg');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -10,11 +9,107 @@ const PORT = process.env.PORT || 3001;
 app.use(cors());
 app.use(express.json());
 
+// --- Database Connection (Single File Strategy) ---
+let sequelize;
+let Board, Column, Card, Message, ChecklistItem;
+
+try {
+  const dbConfig = {
+    dialect: 'postgres',
+    protocol: 'postgres',
+    dialectModule: pg,
+    dialectOptions: {
+      ssl: {
+        require: true,
+        rejectUnauthorized: false
+      }
+    }
+  };
+
+  if (process.env.POSTGRES_URL) {
+    sequelize = new Sequelize(process.env.POSTGRES_URL, dbConfig);
+  } else {
+    // Fallback for local development or if env var is missing
+    const env = process.env.NODE_ENV || 'development';
+    const config = require('./config/config.json')[env];
+    if (config.use_env_variable && process.env[config.use_env_variable]) {
+        sequelize = new Sequelize(process.env[config.use_env_variable], dbConfig);
+    } else {
+        sequelize = new Sequelize(config.database, config.username, config.password, {
+            ...config,
+            ...dbConfig
+        });
+    }
+  }
+
+  // --- Model Definitions ---
+  Board = sequelize.define('Board', {
+    title: DataTypes.STRING,
+    description: DataTypes.TEXT
+  });
+
+  Column = sequelize.define('Column', {
+    title: DataTypes.STRING,
+    order: DataTypes.INTEGER,
+    boardId: DataTypes.INTEGER
+  });
+
+  Card = sequelize.define('Card', {
+    title: DataTypes.STRING,
+    menteeName: DataTypes.STRING,
+    menteeContext: DataTypes.TEXT,
+    menteeGoal: DataTypes.TEXT,
+    mentorPerception: DataTypes.TEXT,
+    mentorResistance: DataTypes.TEXT,
+    mentorAttention: DataTypes.TEXT,
+    mentorEmotion: DataTypes.TEXT,
+    phase: DataTypes.STRING,
+    energyMentee: DataTypes.INTEGER,
+    energyMentor: DataTypes.INTEGER,
+    decisionsTaken: DataTypes.TEXT,
+    decisionsOpen: DataTypes.TEXT,
+    reflections: DataTypes.TEXT,
+    columnId: DataTypes.INTEGER,
+    type: { type: DataTypes.STRING, defaultValue: 'generic' }
+  });
+
+  Message = sequelize.define('Message', {
+    content: DataTypes.TEXT,
+    authorType: DataTypes.STRING,
+    authorName: DataTypes.STRING,
+    cardId: DataTypes.INTEGER
+  });
+
+  ChecklistItem = sequelize.define('ChecklistItem', {
+    content: DataTypes.STRING,
+    isCompleted: DataTypes.BOOLEAN,
+    cardId: DataTypes.INTEGER
+  });
+
+  // --- Associations ---
+  Board.hasMany(Column, { foreignKey: 'boardId', as: 'columns' });
+  Column.belongsTo(Board, { foreignKey: 'boardId', as: 'board' });
+  
+  Column.hasMany(Card, { foreignKey: 'columnId', as: 'cards' });
+  Card.belongsTo(Column, { foreignKey: 'columnId', as: 'column' });
+  
+  Card.hasMany(Message, { foreignKey: 'cardId', as: 'messages' });
+  Message.belongsTo(Card, { foreignKey: 'cardId', as: 'card' });
+  
+  Card.hasMany(ChecklistItem, { foreignKey: 'cardId', as: 'checklist' });
+  ChecklistItem.belongsTo(Card, { foreignKey: 'cardId', as: 'card' });
+
+} catch (err) {
+  console.error('Critical Database Initialization Error:', err);
+  // We don't crash here, we let requests fail gracefully with 500
+}
+
 // --- System Routes ---
 app.get('/', (req, res) => {
     res.json({ 
         status: 'Backend running', 
         env: process.env.NODE_ENV,
+        db_initialized: !!sequelize,
         timestamp: new Date().toISOString() 
     });
 });
@@ -25,6 +120,7 @@ app.get('/api/health', (req, res) => {
 
 app.get('/api/migrate', async (req, res) => {
   try {
+    if (!sequelize) throw new Error('Database not initialized');
     await sequelize.authenticate();
     console.log('Database connection OK!');
     await sequelize.sync({ alter: true });
@@ -39,12 +135,14 @@ app.get('/api/migrate', async (req, res) => {
   }
 });
 
-// Test connection immediately to catch errors early
-sequelize.authenticate().then(() => {
-  console.log('Database connection OK!');
-}).catch(err => {
-  console.error('Unable to connect to the database:', err);
-});
+// Test connection immediately
+if (sequelize) {
+    sequelize.authenticate().then(() => {
+      console.log('Database connection OK!');
+    }).catch(err => {
+      console.error('Unable to connect to the database:', err);
+    });
+}
 
 // --- Routes ---
 app.get('/api/debug/env', (req, res) => {
