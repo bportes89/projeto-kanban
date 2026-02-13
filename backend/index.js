@@ -12,6 +12,7 @@ app.use(express.json());
 // --- Database Connection (Single File Strategy) ---
 let sequelize;
 let Board, Column, Card, Message, ChecklistItem;
+let dbInitError = null;
 
 try {
   const dbConfig = {
@@ -101,15 +102,33 @@ try {
 
 } catch (err) {
   console.error('Critical Database Initialization Error:', err);
-  // We don't crash here, we let requests fail gracefully with 500
+  dbInitError = err;
 }
+
+//Middleware to check DB status
+const checkDb = (req, res, next) => {
+    if (dbInitError) {
+        return res.status(500).json({
+            error: 'Database initialization failed',
+            details: dbInitError.message,
+            stack: dbInitError.stack
+        });
+    }
+    if (!Board) {
+        return res.status(500).json({
+            error: 'Models not initialized',
+            details: 'Database connection failed silently or is pending.'
+        });
+    }
+    next();
+};
 
 // --- System Routes ---
 app.get('/', (req, res) => {
     res.json({ 
         status: 'Backend running', 
         env: process.env.NODE_ENV,
-        db_initialized: !!sequelize,
+        db_initialized: !!sequelize && !dbInitError,
         timestamp: new Date().toISOString() 
     });
 });
@@ -120,6 +139,7 @@ app.get('/api/health', (req, res) => {
 
 app.get('/api/migrate', async (req, res) => {
   try {
+    if (dbInitError) throw dbInitError;
     if (!sequelize) throw new Error('Database not initialized');
     await sequelize.authenticate();
     console.log('Database connection OK!');
@@ -141,6 +161,7 @@ if (sequelize) {
       console.log('Database connection OK!');
     }).catch(err => {
       console.error('Unable to connect to the database:', err);
+      dbInitError = err;
     });
 }
 
@@ -149,13 +170,13 @@ app.get('/api/debug/env', (req, res) => {
     res.json({
         node_env: process.env.NODE_ENV,
         has_postgres_url: !!process.env.POSTGRES_URL,
-        dialect: require('./config/config.json').production?.dialect,
-        use_env: require('./config/config.json').production?.use_env_variable
+        dialect: 'postgres',
+        db_init_error: dbInitError ? dbInitError.message : null
     });
 });
 
 // Get all boards
-app.get('/api/boards', async (req, res) => {
+app.get('/api/boards', checkDb, async (req, res) => {
   try {
     const boards = await Board.findAll();
     res.json(boards);
@@ -165,7 +186,7 @@ app.get('/api/boards', async (req, res) => {
 });
 
 // Create board
-app.post('/api/boards', async (req, res) => {
+app.post('/api/boards', checkDb, async (req, res) => {
   try {
     const { title, description } = req.body;
     const board = await Board.create({ title, description });
@@ -187,7 +208,7 @@ app.post('/api/boards', async (req, res) => {
 });
 
 // Create Column
-app.post('/api/boards/:id/columns', async (req, res) => {
+app.post('/api/boards/:id/columns', checkDb, async (req, res) => {
   try {
     const { title, order } = req.body;
     const column = await Column.create({
