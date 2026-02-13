@@ -1,0 +1,24 @@
+@import "tailwindcss";
+
+@layer base {
+  body {
+    background-color: #141414;
+    color: white;
+  }
+}
+
+/* Custom Scrollbar for "Netflix" feel */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background-color: #141414;
+}
+::-webkit-scrollbar-thumb {
+  background-color: #3f3f46; /* zinc-700 */
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background-color: #71717a; /* zinc-500 */
+}

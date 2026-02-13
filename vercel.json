@@ -1,0 +1,22 @@
+{
+  "version": 2,
+  "builds": [
+    {
+      "src": "backend/index.js",
+      "use": "@vercel/node"
+    },
+    {
+      "src": "ai_service/main.py",
+      "use": "@vercel/python"
+    },
+    {
+      "src": "frontend/package.json",
+      "use": "@vercel/static-build"
+    }
+  ],
+  "rewrites": [
+    { "source": "/api/ai/analyze", "destination": "/ai_service/main.py" },
+    { "source": "/api/(.*)", "destination": "/backend/index.js" },
+    { "source": "/(.*)", "destination": "/frontend/$1" }
+  ]
+}
