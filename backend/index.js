@@ -32,22 +32,29 @@ try {
     console.log(`POSTGRES_URL type: ${typeof process.env.POSTGRES_URL}, length: ${process.env.POSTGRES_URL.length}`);
     
     try {
-         // Remove protocol from dbConfig to avoid conflicts with connection string
+         console.log('Using POSTGRES_URL environment variable');
+         // We'll parse the URL manually to avoid Sequelize's internal parser issues with some env strings
+         const connectionString = String(process.env.POSTGRES_URL).trim();
+         
+         // Alternative approach: Don't use the connection string directly in the constructor if it fails
+         // Instead, parse it and pass as options object if possible, or try a different instantiation pattern
+         
          const { protocol, ...cleanDbConfig } = dbConfig;
          
-         // Fix for Vercel/Sequelize issue with pg
-         // We must manually pass the dialectModule again because Sequelize v6 sometimes loses it in the constructor
-         const sequelizeConfig = {
+         sequelize = new Sequelize(connectionString, {
              ...cleanDbConfig,
              dialect: 'postgres',
              dialectModule: pg,
-             logging: false
-         };
-         
-         // Parse the connection string manually to ensure it's valid string for Sequelize
-         const connectionString = String(process.env.POSTGRES_URL).trim();
-         
-         sequelize = new Sequelize(connectionString, sequelizeConfig);
+             logging: false,
+             // Explicitly tell Sequelize to not rely on global pg module
+             dialectOptions: {
+                 ...cleanDbConfig.dialectOptions,
+                 ssl: {
+                     require: true,
+                     rejectUnauthorized: false
+                 }
+             }
+         });
      } catch (err) {
         const debugInfo = `URL_Type=${typeof process.env.POSTGRES_URL}, URL_Len=${process.env.POSTGRES_URL ? process.env.POSTGRES_URL.length : 0}`;
         throw new Error(`Failed to initialize Sequelize with POSTGRES_URL: ${err.message}. Debug: ${debugInfo}`);
