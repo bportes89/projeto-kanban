@@ -20,7 +20,20 @@ const BoardList = () => {
       setBoards(response.data);
     } catch (error) {
       console.error('Error fetching boards:', error);
-      setError('Erro ao carregar quadros.');
+      // Try to migrate if boards fail (first run fix)
+      if (error.response && error.response.status === 500) {
+          try {
+              console.log('Attempting auto-migration...');
+              await api.get('/migrate');
+              // Retry fetching boards
+              const retryResponse = await getBoards();
+              setBoards(retryResponse.data);
+              return;
+          } catch (migrateError) {
+              console.error('Auto-migration failed:', migrateError);
+          }
+      }
+      setError('Erro ao carregar quadros. Verifique se o backend está rodando.');
     } finally {
       setLoading(false);
     }
