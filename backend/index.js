@@ -32,16 +32,18 @@ try {
     console.log(`POSTGRES_URL type: ${typeof process.env.POSTGRES_URL}, length: ${process.env.POSTGRES_URL.length}`);
     
     try {
-        // Remove protocol from dbConfig to avoid conflicts with connection string
-        const { protocol, ...cleanDbConfig } = dbConfig;
-        
-        sequelize = new Sequelize(process.env.POSTGRES_URL, {
-            ...cleanDbConfig,
-            dialect: 'postgres',
-            dialectModule: pg,
-            logging: false // Reduce log noise
-        });
-    } catch (err) {
+         // Remove protocol from dbConfig to avoid conflicts with connection string
+         const { protocol, ...cleanDbConfig } = dbConfig;
+         
+         // Fix for Vercel/Sequelize issue with pg
+         // We must manually pass the dialectModule again because Sequelize v6 sometimes loses it in the constructor
+         sequelize = new Sequelize(process.env.POSTGRES_URL, {
+             ...cleanDbConfig,
+             dialect: 'postgres',
+             dialectModule: pg,
+             logging: false
+         });
+     } catch (err) {
         const debugInfo = `URL_Type=${typeof process.env.POSTGRES_URL}, URL_Len=${process.env.POSTGRES_URL ? process.env.POSTGRES_URL.length : 0}`;
         throw new Error(`Failed to initialize Sequelize with POSTGRES_URL: ${err.message}. Debug: ${debugInfo}`);
     }
