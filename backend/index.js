@@ -28,14 +28,31 @@ try {
   };
 
   if (process.env.POSTGRES_URL) {
+    console.log('Using POSTGRES_URL environment variable');
     sequelize = new Sequelize(process.env.POSTGRES_URL, dbConfig);
   } else {
     // Fallback for local development or if env var is missing
     const env = process.env.NODE_ENV || 'development';
+    console.log(`Using config.json for environment: ${env}`);
+    
+    // Safety check for config
     const config = require('./config/config.json')[env];
-    if (config.use_env_variable && process.env[config.use_env_variable]) {
-        sequelize = new Sequelize(process.env[config.use_env_variable], dbConfig);
+    if (!config) {
+        throw new Error(`Configuration for environment "${env}" not found in config.json`);
+    }
+
+    if (config.use_env_variable) {
+        const envVarName = config.use_env_variable;
+        const envVarValue = process.env[envVarName];
+        
+        if (!envVarValue) {
+            throw new Error(`Environment variable "${envVarName}" is defined in config but has no value in process.env`);
+        }
+        
+        console.log(`Using env variable from config: ${envVarName}`);
+        sequelize = new Sequelize(envVarValue, dbConfig);
     } else {
+        console.log('Using direct credentials from config');
         sequelize = new Sequelize(config.database, config.username, config.password, {
             ...config,
             ...dbConfig
