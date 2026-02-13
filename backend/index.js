@@ -29,7 +29,11 @@ try {
 
   if (process.env.POSTGRES_URL) {
     console.log('Using POSTGRES_URL environment variable');
-    sequelize = new Sequelize(process.env.POSTGRES_URL, dbConfig);
+    try {
+        sequelize = new Sequelize(process.env.POSTGRES_URL, dbConfig);
+    } catch (err) {
+        throw new Error(`Failed to initialize Sequelize with POSTGRES_URL: ${err.message}`);
+    }
   } else {
     // Fallback for local development or if env var is missing
     const env = process.env.NODE_ENV || 'development';

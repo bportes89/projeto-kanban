@@ -15,7 +15,11 @@ if (config.dialect === 'postgres') {
 let sequelize;
 try {
   if (config.use_env_variable) {
-    sequelize = new Sequelize(process.env[config.use_env_variable], config);
+    const envVarValue = process.env[config.use_env_variable];
+    if (!envVarValue) {
+      throw new Error(`Environment variable "${config.use_env_variable}" is missing.`);
+    }
+    sequelize = new Sequelize(envVarValue, config);
   } else {
     sequelize = new Sequelize(config.database, config.username, config.password, config);
   }
