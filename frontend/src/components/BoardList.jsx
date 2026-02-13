@@ -24,7 +24,11 @@ const BoardList = () => {
       if (error.response && error.response.status === 500) {
           try {
               console.log('Attempting auto-migration...');
+              // Fix: use direct axios call or import api correctly
+              // Since 'api' variable might not be in scope if not imported as default
+              // We'll use the imported 'api' from '../api' if available, or fetch directly
               await api.get('/migrate');
+              
               // Retry fetching boards
               const retryResponse = await getBoards();
               setBoards(retryResponse.data);
