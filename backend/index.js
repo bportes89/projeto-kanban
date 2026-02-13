@@ -33,22 +33,25 @@ try {
     
     try {
          console.log('Using POSTGRES_URL environment variable');
-         // We'll parse the URL manually to avoid Sequelize's internal parser issues with some env strings
+         // Use regex to parse connection string manually
+         // Format: postgres://user:password@host:port/database
          const connectionString = String(process.env.POSTGRES_URL).trim();
          
-         // Alternative approach: Don't use the connection string directly in the constructor if it fails
-         // Instead, parse it and pass as options object if possible, or try a different instantiation pattern
+         // Try to use the connection string first, but with a different instantiation pattern that avoids "replace" error
+         // This pattern passes options as the second argument, but we ensure no nulls are passed
          
          const { protocol, ...cleanDbConfig } = dbConfig;
          
-         sequelize = new Sequelize(connectionString, {
-             ...cleanDbConfig,
+         // Manual parsing as fallback/alternative to avoid Sequelize string parser issues
+         const url = new URL(connectionString);
+         
+         sequelize = new Sequelize(url.pathname.substring(1), url.username, url.password, {
+             host: url.hostname,
+             port: url.port,
              dialect: 'postgres',
              dialectModule: pg,
              logging: false,
-             // Explicitly tell Sequelize to not rely on global pg module
              dialectOptions: {
-                 ...cleanDbConfig.dialectOptions,
                  ssl: {
                      require: true,
                      rejectUnauthorized: false
