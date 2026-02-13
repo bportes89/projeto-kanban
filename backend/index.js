@@ -85,10 +85,19 @@ try {
              }
          });
      } catch (err) {
-        const debugInfo = `URL_Type=${typeof process.env.POSTGRES_URL}, URL_Len=${process.env.POSTGRES_URL ? process.env.POSTGRES_URL.length : 0}`;
-        throw new Error(`Failed to initialize Sequelize with POSTGRES_URL: ${err.message}. Debug: ${debugInfo}`);
-    }
-  } else {
+         // Enhance error message with more details about what failed
+         const errorDetails = err.original ? `Original Error: ${err.original.message}` : err.message;
+         const debugInfo = `URL_Type=${typeof process.env.POSTGRES_URL}, URL_Len=${process.env.POSTGRES_URL ? process.env.POSTGRES_URL.length : 0}`;
+         
+         // Don't just set the error, log it comprehensively
+         console.error('CRITICAL DATABASE INITIALIZATION ERROR:', err);
+         
+         dbInitError = new Error(`Failed to initialize Sequelize: ${errorDetails}. Debug: ${debugInfo}`);
+         
+         // DO NOT THROW here if we want the server to start and report the error via API
+         // throwing here causes the serverless function to crash immediately
+     }
+ } else {
     // Fallback for local development or if env var is missing
     const env = process.env.NODE_ENV || 'development';
     console.log(`Using config.json for environment: ${env}`);
@@ -186,13 +195,15 @@ try {
   dbInitError = err;
 }
 
-//Middleware to check DB status
+// Middleware to check DB status
 const checkDb = (req, res, next) => {
     if (dbInitError) {
+        // Return JSON error that frontend can parse, not just a string
         return res.status(500).json({
             error: 'Database initialization failed',
-            details: dbInitError.message,
-            stack: dbInitError.stack
+            message: dbInitError.message,
+            details: dbInitError.toString(),
+            stack: process.env.NODE_ENV === 'development' ? dbInitError.stack : undefined
         });
     }
     if (!Board) {
