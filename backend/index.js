@@ -37,12 +37,17 @@ try {
          
          // Fix for Vercel/Sequelize issue with pg
          // We must manually pass the dialectModule again because Sequelize v6 sometimes loses it in the constructor
-         sequelize = new Sequelize(process.env.POSTGRES_URL, {
+         const sequelizeConfig = {
              ...cleanDbConfig,
              dialect: 'postgres',
              dialectModule: pg,
              logging: false
-         });
+         };
+         
+         // Parse the connection string manually to ensure it's valid string for Sequelize
+         const connectionString = String(process.env.POSTGRES_URL).trim();
+         
+         sequelize = new Sequelize(connectionString, sequelizeConfig);
      } catch (err) {
         const debugInfo = `URL_Type=${typeof process.env.POSTGRES_URL}, URL_Len=${process.env.POSTGRES_URL ? process.env.POSTGRES_URL.length : 0}`;
         throw new Error(`Failed to initialize Sequelize with POSTGRES_URL: ${err.message}. Debug: ${debugInfo}`);
