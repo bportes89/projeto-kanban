@@ -69,11 +69,19 @@ try {
              dialect: 'postgres',
              dialectModule: pg,
              logging: false,
+             pool: {
+                 max: 1, // Reduce connection pool for serverless
+                 min: 0,
+                 acquire: 30000,
+                 idle: 10000
+             },
              dialectOptions: {
                  ssl: {
                      require: true,
-                     rejectUnauthorized: false
-                 }
+                     rejectUnauthorized: false // Required for some Vercel/Postgres providers
+                 },
+                 keepAlive: true, // Help keep connection alive
+                 connectionTimeoutMillis: 10000 // Timeout faster if stuck
              }
          });
      } catch (err) {
