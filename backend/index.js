@@ -172,9 +172,14 @@ app.get('/api/health', (req, res) => {
 
 app.get('/api/migrate', async (req, res) => {
   try {
-    if (dbInitError) throw dbInitError;
-    if (!sequelize) throw new Error('Database not initialized');
-    
+    // Attempt lazy initialization if needed
+    if (dbInitError || !sequelize) {
+         console.log('Migration: Retrying database initialization...');
+         const success = initDB();
+         if (!success && dbInitError) throw dbInitError;
+         if (!success) throw new Error('Database initialization failed');
+    }
+
     // Retry logic for cold starts
     const maxRetries = 3;
     let lastError;
@@ -275,7 +280,7 @@ app.post('/api/boards/:id/columns', checkDb, async (req, res) => {
 });
 
 // Update Column
-app.put('/api/columns/:id', async (req, res) => {
+app.put('/api/columns/:id', checkDb, async (req, res) => {
   try {
     const column = await Column.findByPk(req.params.id);
     if (!column) return res.status(404).json({ error: 'Column not found' });
@@ -287,7 +292,7 @@ app.put('/api/columns/:id', async (req, res) => {
 });
 
 // Get board details
-app.get('/api/boards/:id', async (req, res) => {
+app.get('/api/boards/:id', checkDb, async (req, res) => {
   try {
     const board = await Board.findByPk(req.params.id, {
       include: {
@@ -317,7 +322,7 @@ app.get('/api/boards/:id', async (req, res) => {
 });
 
 // Create Card
-app.post('/api/cards', async (req, res) => {
+app.post('/api/cards', checkDb, async (req, res) => {
   try {
     const card = await Card.create(req.body);
     res.status(201).json(card);
@@ -327,7 +332,7 @@ app.post('/api/cards', async (req, res) => {
 });
 
 // Update Card
-app.put('/api/cards/:id', async (req, res) => {
+app.put('/api/cards/:id', checkDb, async (req, res) => {
   try {
     const card = await Card.findByPk(req.params.id);
     if (!card) return res.status(404).json({ error: 'Card not found' });
@@ -339,7 +344,7 @@ app.put('/api/cards/:id', async (req, res) => {
 });
 
 // --- Messages Routes ---
-app.post('/api/cards/:id/messages', async (req, res) => {
+app.post('/api/cards/:id/messages', checkDb, async (req, res) => {
   try {
     const { content, authorType, authorName } = req.body;
     const message = await Message.create({
@@ -355,7 +360,7 @@ app.post('/api/cards/:id/messages', async (req, res) => {
 });
 
 // --- Checklist Routes ---
-app.post('/api/cards/:id/checklist', async (req, res) => {
+app.post('/api/cards/:id/checklist', checkDb, async (req, res) => {
   try {
     const { content } = req.body;
     const item = await ChecklistItem.create({
@@ -369,7 +374,7 @@ app.post('/api/cards/:id/checklist', async (req, res) => {
   }
 });
 
-app.put('/api/checklist/:id', async (req, res) => {
+app.put('/api/checklist/:id', checkDb, async (req, res) => {
   try {
     const item = await ChecklistItem.findByPk(req.params.id);
     if (!item) return res.status(404).json({ error: 'Item not found' });
@@ -387,7 +392,7 @@ app.put('/api/checklist/:id', async (req, res) => {
   }
 });
 
-app.delete('/api/checklist/:id', async (req, res) => {
+app.delete('/api/checklist/:id', checkDb, async (req, res) => {
   try {
     const item = await ChecklistItem.findByPk(req.params.id);
     if (!item) return res.status(404).json({ error: 'Item not found' });
