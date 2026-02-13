@@ -70,19 +70,20 @@ try {
              dialectModule: pg,
              logging: false,
              pool: {
-                 max: 1, // Keep low for serverless
-                 min: 0,
-                 acquire: 60000, // Increase acquire timeout to 60s for cold starts
-                 idle: 10000
-             },
-             dialectOptions: {
-                 ssl: {
-                     require: true,
-                     rejectUnauthorized: false
-                 },
-                 keepAlive: true,
-                 connectionTimeoutMillis: 30000 // Increase connection timeout to 30s
-             }
+                max: 1, // Keep low for serverless
+                min: 0,
+                acquire: 120000, // Increase acquire timeout to 120s for cold starts and sync
+                idle: 10000
+            },
+            dialectOptions: {
+                ssl: {
+                    require: true,
+                    rejectUnauthorized: false
+                },
+                keepAlive: true,
+                connectionTimeoutMillis: 60000, // Increase connection timeout to 60s
+                statement_timeout: 60000 // Ensure long queries/syncs don't fail prematurely
+            }
          });
      } catch (err) {
          // Enhance error message with more details about what failed
@@ -251,11 +252,7 @@ app.get('/api/migrate', async (req, res) => {
 if (sequelize) {
     sequelize.authenticate().then(() => {
       console.log('Database connection OK!');
-      // Auto-sync models to create tables if they don't exist
-      console.log('Syncing database models...');
-      return sequelize.sync({ alter: true });
-    }).then(() => {
-      console.log('Database synced successfully!');
+      // Sync removed from startup to prevent timeouts. Use /api/migrate endpoint instead.
     }).catch(err => {
       console.error('Unable to connect to the database:', err);
       dbInitError = err;
