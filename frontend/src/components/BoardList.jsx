@@ -33,7 +33,8 @@ const BoardList = () => {
               console.error('Auto-migration failed:', migrateError);
           }
       }
-      setError('Erro ao carregar quadros. Verifique se o backend está rodando.');
+      const errorMessage = error.response?.data?.error || error.message || 'Erro ao carregar quadros.';
+      setError(`Erro: ${errorMessage}`);
     } finally {
       setLoading(false);
     }

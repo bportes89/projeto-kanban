@@ -4,10 +4,16 @@ const fs = require('fs');
 const path = require('path');
 const Sequelize = require('sequelize');
 const process = require('process');
+const pg = require('pg'); // Required for Vercel/Serverless
 const basename = path.basename(__filename);
 const env = process.env.NODE_ENV || 'development';
 const config = require(__dirname + '/../config/config.json')[env];
 const db = {};
+
+// Fix for Vercel/Sequelize issue with pg
+if (config.dialect === 'postgres') {
+  config.dialectModule = pg;
+}
 
 let sequelize;
 if (config.use_env_variable) {
