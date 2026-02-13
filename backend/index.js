@@ -1,7 +1,8 @@
 const express = require('express');
 const cors = require('cors');
-const { Board, Column, Card, Message, ChecklistItem } = require('./models');
-const axios = require('axios');
+// Import models and sequelize instance *once*
+const db = require('./models');
+const { Board, Column, Card, Message, ChecklistItem, sequelize } = db;
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -10,11 +11,18 @@ app.use(cors());
 app.use(express.json());
 
 // --- System Routes ---
+app.get('/', (req, res) => {
+    res.json({ 
+        status: 'Backend running', 
+        env: process.env.NODE_ENV,
+        timestamp: new Date().toISOString() 
+    });
+});
+
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date() });
 });
 
-const { sequelize } = require('./models');
 app.get('/api/migrate', async (req, res) => {
   try {
     await sequelize.authenticate();
@@ -32,7 +40,6 @@ app.get('/api/migrate', async (req, res) => {
 });
 
 // Test connection immediately to catch errors early
-const { sequelize } = require('./models');
 sequelize.authenticate().then(() => {
   console.log('Database connection OK!');
 }).catch(err => {
