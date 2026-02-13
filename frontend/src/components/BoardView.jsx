@@ -1,12 +1,13 @@
 import React, { useEffect, useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 import { getBoard, updateCard, createCard, createColumn, updateColumn } from '../api';
 import CardModal from './CardModal';
-import { Plus, MoreHorizontal } from 'lucide-react';
+import { Plus, MoreHorizontal, ArrowLeft } from 'lucide-react';
 
 const BoardView = () => {
   const { boardId } = useParams();
+  const navigate = useNavigate();
   const [board, setBoard] = useState(null);
   const [selectedCard, setSelectedCard] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -96,9 +97,18 @@ const BoardView = () => {
 
   return (
     <div className="h-[calc(100vh-140px)] flex flex-col animate-in fade-in duration-700">
-      <div className="mb-8">
-        <h2 className="text-4xl font-bold text-white uppercase tracking-tighter drop-shadow-lg">{board.title}</h2>
-        {board.description && <p className="text-zinc-400 mt-2 text-sm max-w-2xl">{board.description}</p>}
+      <div className="mb-8 flex items-start gap-4">
+        <button 
+          onClick={() => navigate('/boards')} 
+          className="mt-1 p-2 text-zinc-400 hover:text-white hover:bg-white/10 rounded-full transition"
+          title="Voltar para a lista de quadros"
+        >
+          <ArrowLeft size={24} />
+        </button>
+        <div>
+          <h2 className="text-4xl font-bold text-white uppercase tracking-tighter drop-shadow-lg">{board.title}</h2>
+          {board.description && <p className="text-zinc-400 mt-2 text-sm max-w-2xl">{board.description}</p>}
+        </div>
       </div>
       
       <DragDropContext onDragEnd={onDragEnd}>
