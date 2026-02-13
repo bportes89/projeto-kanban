@@ -23,11 +23,23 @@ app.get('/api/migrate', async (req, res) => {
     res.json({ status: 'Database synced successfully!' });
   } catch (error) {
     console.error('Migration failed:', error);
-    res.status(500).json({ error: 'Migration failed: ' + error.message });
+    res.status(500).json({ 
+        error: 'Migration failed',
+        details: error.message,
+        stack: error.stack 
+    });
   }
 });
 
 // --- Routes ---
+app.get('/api/debug/env', (req, res) => {
+    res.json({
+        node_env: process.env.NODE_ENV,
+        has_postgres_url: !!process.env.POSTGRES_URL,
+        dialect: require('./config/config.json').production?.dialect,
+        use_env: require('./config/config.json').production?.use_env_variable
+    });
+});
 
 // Get all boards
 app.get('/api/boards', async (req, res) => {
