@@ -33,17 +33,27 @@ try {
     
     try {
          console.log('Using POSTGRES_URL environment variable');
-         // Use regex to parse connection string manually
-         // Format: postgres://user:password@host:port/database
-         const connectionString = String(process.env.POSTGRES_URL).trim();
-         
-         // Try to use the connection string first, but with a different instantiation pattern that avoids "replace" error
-         // This pattern passes options as the second argument, but we ensure no nulls are passed
+         // Clean connection string - remove quotes if they exist
+         let connectionString = String(process.env.POSTGRES_URL).trim();
+         if (connectionString.startsWith('"') && connectionString.endsWith('"')) {
+             connectionString = connectionString.slice(1, -1);
+         }
          
          const { protocol, ...cleanDbConfig } = dbConfig;
          
-         // Manual parsing as fallback/alternative to avoid Sequelize string parser issues
-         const url = new URL(connectionString);
+         // Try manual parsing with better error handling
+         let url;
+         try {
+            url = new URL(connectionString);
+         } catch (e) {
+            // If URL parsing fails, maybe it's missing the protocol?
+            if (!connectionString.includes('://')) {
+                 console.log('URL missing protocol, adding postgres://');
+                 url = new URL('postgres://' + connectionString);
+            } else {
+                 throw e;
+            }
+         }
          
          sequelize = new Sequelize(url.pathname.substring(1), url.username, url.password, {
              host: url.hostname,
