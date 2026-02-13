@@ -39,7 +39,9 @@ const BoardList = () => {
       fetchBoards();
     } catch (error) {
       console.error('Error creating board:', error);
-      setError('Erro ao criar quadro. Tente novamente.');
+      // More detailed error message
+      const errorMessage = error.response?.data?.error || 'Erro ao criar quadro. Tente novamente.';
+      setError(errorMessage);
     } finally {
       setCreating(false);
     }
