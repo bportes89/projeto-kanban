@@ -14,188 +14,146 @@ let sequelize;
 let Board, Column, Card, Message, ChecklistItem;
 let dbInitError = null;
 
-try {
-  const dbConfig = {
-    dialect: 'postgres',
-    protocol: 'postgres',
-    dialectModule: pg,
-    dialectOptions: {
-      ssl: {
-        require: true,
-        rejectUnauthorized: false
-      }
-    }
-  };
-
-  if (process.env.POSTGRES_URL) {
-    console.log('Using POSTGRES_URL environment variable');
-    console.log(`POSTGRES_URL type: ${typeof process.env.POSTGRES_URL}, length: ${process.env.POSTGRES_URL.length}`);
-    
+// Function to initialize database connection
+const initDB = () => {
     try {
-         console.log('Using POSTGRES_URL environment variable');
-         // Clean connection string - remove quotes if they exist
-         let connectionString = String(process.env.POSTGRES_URL).trim();
-         if (connectionString.startsWith('"') && connectionString.endsWith('"')) {
-             connectionString = connectionString.slice(1, -1);
-         }
-         
-         // Special handling for psql command format (common mistake)
-         // e.g., "psql 'postgres://...'"
-         if (connectionString.startsWith("psql '")) {
-             connectionString = connectionString.replace("psql '", "").replace("'", "");
-         }
-         
-         console.log('Using connection string directly with Sequelize');
-         
-         sequelize = new Sequelize(connectionString, {
-             dialect: 'postgres',
-             dialectModule: pg,
-             logging: false,
-             pool: {
-                max: 1, // Keep low for serverless
-                min: 0,
-                acquire: 120000, // Increase acquire timeout to 120s for cold starts and sync
-                idle: 10000
-            },
+        const dbConfig = {
+            dialect: 'postgres',
+            protocol: 'postgres',
+            dialectModule: pg,
             dialectOptions: {
                 ssl: {
                     require: true,
                     rejectUnauthorized: false
-                },
-                keepAlive: true,
-                connectionTimeoutMillis: 60000, // Increase connection timeout to 60s
-                statement_timeout: 60000 // Ensure long queries/syncs don't fail prematurely
+                }
             }
-         });
-     } catch (err) {
-         // Enhance error message with more details about what failed
-         const errorDetails = err.original ? `Original Error: ${err.original.message}` : err.message;
-         const debugInfo = `URL_Type=${typeof process.env.POSTGRES_URL}, URL_Len=${process.env.POSTGRES_URL ? process.env.POSTGRES_URL.length : 0}`;
-         
-         // Don't just set the error, log it comprehensively
-         console.error('CRITICAL DATABASE INITIALIZATION ERROR:', err);
-         
-         dbInitError = new Error(`Failed to initialize Sequelize: ${errorDetails}. Debug: ${debugInfo}`);
-         
-         // DO NOT THROW here if we want the server to start and report the error via API
-         // throwing here causes the serverless function to crash immediately
-     }
- } else {
-    // Fallback for local development or if env var is missing
-    const env = process.env.NODE_ENV || 'development';
-    console.log(`Using config.json for environment: ${env}`);
-    
-    try {
-        const config = require('./config/config.json')[env];
-        if (!config) {
-            throw new Error(`Configuration for environment "${env}" not found in config.json`);
+        };
+
+        if (process.env.POSTGRES_URL) {
+            let connectionString = String(process.env.POSTGRES_URL).trim();
+            if (connectionString.startsWith('"') && connectionString.endsWith('"')) {
+                connectionString = connectionString.slice(1, -1);
+            }
+            if (connectionString.startsWith("psql '")) {
+                connectionString = connectionString.replace("psql '", "").replace("'", "");
+            }
+            
+            console.log('Using connection string directly with Sequelize');
+            
+            sequelize = new Sequelize(connectionString, {
+                dialect: 'postgres',
+                dialectModule: pg,
+                logging: false,
+                pool: {
+                    max: 1,
+                    min: 0,
+                    acquire: 30000,
+                    idle: 10000
+                },
+                dialectOptions: {
+                    ssl: {
+                        require: true,
+                        rejectUnauthorized: false
+                    },
+                    keepAlive: true,
+                    connectionTimeoutMillis: 30000
+                }
+            });
+        } else {
+            // Fallback for local
+            const env = process.env.NODE_ENV || 'development';
+            const config = require('./config/config.json')[env];
+            if (!config) throw new Error(`Configuration for environment "${env}" not found`);
+
+            if (config.use_env_variable) {
+                const envVarValue = process.env[config.use_env_variable];
+                if (!envVarValue) throw new Error(`Environment variable "${config.use_env_variable}" is missing`);
+                sequelize = new Sequelize(envVarValue, dbConfig);
+            } else {
+                sequelize = new Sequelize(config.database, config.username, config.password, { ...config, ...dbConfig });
+            }
         }
 
-        if (config.use_env_variable) {
-            const envVarName = config.use_env_variable;
-            const envVarValue = process.env[envVarName];
-            
-            if (!envVarValue) {
-                // IMPORTANT: If env var is missing in production, DO NOT try to connect with null
-                // Just throw error immediately
-                throw new Error(`CRITICAL: Environment variable "${envVarName}" is missing! Cannot connect to database.`);
-            }
-            
-            console.log(`Using env variable from config: ${envVarName}`);
-            sequelize = new Sequelize(envVarValue, dbConfig);
-        } else {
-            console.log('Using direct credentials from config');
-            sequelize = new Sequelize(config.database, config.username, config.password, {
-                ...config,
-                ...dbConfig
+        // --- Model Definitions ---
+        Board = sequelize.define('Board', { title: DataTypes.STRING, description: DataTypes.TEXT });
+        Column = sequelize.define('Column', { title: DataTypes.STRING, order: DataTypes.INTEGER, boardId: DataTypes.INTEGER });
+        Card = sequelize.define('Card', {
+            title: DataTypes.STRING,
+            menteeName: DataTypes.STRING,
+            menteeContext: DataTypes.TEXT,
+            menteeGoal: DataTypes.TEXT,
+            mentorPerception: DataTypes.TEXT,
+            mentorResistance: DataTypes.TEXT,
+            mentorAttention: DataTypes.TEXT,
+            mentorEmotion: DataTypes.TEXT,
+            phase: DataTypes.STRING,
+            energyMentee: DataTypes.INTEGER,
+            energyMentor: DataTypes.INTEGER,
+            decisionsTaken: DataTypes.TEXT,
+            decisionsOpen: DataTypes.TEXT,
+            reflections: DataTypes.TEXT,
+            columnId: DataTypes.INTEGER,
+            type: { type: DataTypes.STRING, defaultValue: 'generic' }
+        });
+        Message = sequelize.define('Message', { content: DataTypes.TEXT, authorType: DataTypes.STRING, authorName: DataTypes.STRING, cardId: DataTypes.INTEGER });
+        ChecklistItem = sequelize.define('ChecklistItem', { content: DataTypes.STRING, isCompleted: DataTypes.BOOLEAN, cardId: DataTypes.INTEGER });
+
+        // --- Associations ---
+        Board.hasMany(Column, { foreignKey: 'boardId', as: 'columns' });
+        Column.belongsTo(Board, { foreignKey: 'boardId', as: 'board' });
+        Column.hasMany(Card, { foreignKey: 'columnId', as: 'cards' });
+        Card.belongsTo(Column, { foreignKey: 'columnId', as: 'column' });
+        Card.hasMany(Message, { foreignKey: 'cardId', as: 'messages' });
+        Message.belongsTo(Card, { foreignKey: 'cardId', as: 'card' });
+        Card.hasMany(ChecklistItem, { foreignKey: 'cardId', as: 'checklist' });
+        ChecklistItem.belongsTo(Card, { foreignKey: 'cardId', as: 'card' });
+
+        console.log('Sequelize initialized successfully');
+        dbInitError = null;
+        return true;
+    } catch (err) {
+        console.error('Database Initialization Error:', err);
+        dbInitError = err;
+        return false;
+    }
+};
+
+// Initial attempt
+initDB();
+
+// Middleware to check DB status with retry logic
+const checkDb = async (req, res, next) => {
+    // If there is an error or no sequelize, try to re-initialize
+    if (dbInitError || !sequelize) {
+        console.log('Retrying database initialization...');
+        const success = initDB();
+        if (!success) {
+            return res.status(500).json({
+                error: 'Database initialization failed',
+                message: dbInitError.message,
+                details: dbInitError.toString()
             });
         }
-    } catch (configError) {
-        console.error('Config loading error:', configError);
-        throw configError;
     }
-  }
 
-  // --- Model Definitions ---
-  Board = sequelize.define('Board', {
-    title: DataTypes.STRING,
-    description: DataTypes.TEXT
-  });
-
-  Column = sequelize.define('Column', {
-    title: DataTypes.STRING,
-    order: DataTypes.INTEGER,
-    boardId: DataTypes.INTEGER
-  });
-
-  Card = sequelize.define('Card', {
-    title: DataTypes.STRING,
-    menteeName: DataTypes.STRING,
-    menteeContext: DataTypes.TEXT,
-    menteeGoal: DataTypes.TEXT,
-    mentorPerception: DataTypes.TEXT,
-    mentorResistance: DataTypes.TEXT,
-    mentorAttention: DataTypes.TEXT,
-    mentorEmotion: DataTypes.TEXT,
-    phase: DataTypes.STRING,
-    energyMentee: DataTypes.INTEGER,
-    energyMentor: DataTypes.INTEGER,
-    decisionsTaken: DataTypes.TEXT,
-    decisionsOpen: DataTypes.TEXT,
-    reflections: DataTypes.TEXT,
-    columnId: DataTypes.INTEGER,
-    type: { type: DataTypes.STRING, defaultValue: 'generic' }
-  });
-
-  Message = sequelize.define('Message', {
-    content: DataTypes.TEXT,
-    authorType: DataTypes.STRING,
-    authorName: DataTypes.STRING,
-    cardId: DataTypes.INTEGER
-  });
-
-  ChecklistItem = sequelize.define('ChecklistItem', {
-    content: DataTypes.STRING,
-    isCompleted: DataTypes.BOOLEAN,
-    cardId: DataTypes.INTEGER
-  });
-
-  // --- Associations ---
-  Board.hasMany(Column, { foreignKey: 'boardId', as: 'columns' });
-  Column.belongsTo(Board, { foreignKey: 'boardId', as: 'board' });
-  
-  Column.hasMany(Card, { foreignKey: 'columnId', as: 'cards' });
-  Card.belongsTo(Column, { foreignKey: 'columnId', as: 'column' });
-  
-  Card.hasMany(Message, { foreignKey: 'cardId', as: 'messages' });
-  Message.belongsTo(Card, { foreignKey: 'cardId', as: 'card' });
-  
-  Card.hasMany(ChecklistItem, { foreignKey: 'cardId', as: 'checklist' });
-  ChecklistItem.belongsTo(Card, { foreignKey: 'cardId', as: 'card' });
-
-} catch (err) {
-  console.error('Critical Database Initialization Error:', err);
-  dbInitError = err;
-}
-
-// Middleware to check DB status
-const checkDb = (req, res, next) => {
-    if (dbInitError) {
-        // Return JSON error that frontend can parse, not just a string
-        return res.status(500).json({
-            error: 'Database initialization failed',
-            message: dbInitError.message,
-            details: dbInitError.toString(),
-            stack: process.env.NODE_ENV === 'development' ? dbInitError.stack : undefined
-        });
+    try {
+        await sequelize.authenticate();
+        next();
+    } catch (err) {
+        console.error('Database connection lost, retrying...', err);
+        // Retry logic for connection specifically
+        try {
+             await sequelize.close(); // Close potentially stale connection
+             initDB(); // Re-init
+             await sequelize.authenticate();
+             next();
+        } catch (retryErr) {
+             return res.status(500).json({
+                error: 'Database connection failed',
+                details: retryErr.message
+            });
+        }
     }
-    if (!Board) {
-        return res.status(500).json({
-            error: 'Models not initialized',
-            details: 'Database connection failed silently or is pending.'
-        });
-    }
-    next();
 };
 
 // --- System Routes ---
@@ -249,15 +207,15 @@ app.get('/api/migrate', async (req, res) => {
 });
 
 // Test connection immediately
-if (sequelize) {
-    sequelize.authenticate().then(() => {
-      console.log('Database connection OK!');
-      // Sync removed from startup to prevent timeouts. Use /api/migrate endpoint instead.
-    }).catch(err => {
-      console.error('Unable to connect to the database:', err);
-      dbInitError = err;
-    });
-}
+// if (sequelize) {
+//     sequelize.authenticate().then(() => {
+//       console.log('Database connection OK!');
+//       // Sync removed from startup to prevent timeouts. Use /api/migrate endpoint instead.
+//     }).catch(err => {
+//       console.error('Unable to connect to the database:', err);
+//       dbInitError = err;
+//     });
+// }
 
 // --- Routes ---
 app.get('/api/debug/env', (req, res) => {
