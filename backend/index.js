@@ -29,10 +29,21 @@ try {
 
   if (process.env.POSTGRES_URL) {
     console.log('Using POSTGRES_URL environment variable');
+    console.log(`POSTGRES_URL type: ${typeof process.env.POSTGRES_URL}, length: ${process.env.POSTGRES_URL.length}`);
+    
     try {
-        sequelize = new Sequelize(process.env.POSTGRES_URL, dbConfig);
+        // Remove protocol from dbConfig to avoid conflicts with connection string
+        const { protocol, ...cleanDbConfig } = dbConfig;
+        
+        sequelize = new Sequelize(process.env.POSTGRES_URL, {
+            ...cleanDbConfig,
+            dialect: 'postgres',
+            dialectModule: pg,
+            logging: false // Reduce log noise
+        });
     } catch (err) {
-        throw new Error(`Failed to initialize Sequelize with POSTGRES_URL: ${err.message}`);
+        const debugInfo = `URL_Type=${typeof process.env.POSTGRES_URL}, URL_Len=${process.env.POSTGRES_URL ? process.env.POSTGRES_URL.length : 0}`;
+        throw new Error(`Failed to initialize Sequelize with POSTGRES_URL: ${err.message}. Debug: ${debugInfo}`);
     }
   } else {
     // Fallback for local development or if env var is missing
